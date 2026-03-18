@@ -11,17 +11,22 @@ import javafx.scene.image.WritableImage;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 
 public class AppController {
 
     @FXML private ImageView visualizadorImagem;
     @FXML private Slider sliderContraste;
+    @FXML private Slider sliderDesfoque;
+    @FXML private Slider sliderManchas;
+    @FXML private Slider sliderCurvas;
     @FXML private Button btnGerarSvg;
 
     private Mat imagemOriginal;
@@ -29,51 +34,53 @@ public class AppController {
 
     @FXML
     public void initialize() {
-        // escuta o slider e atualiza o preview na hora
-        sliderContraste.valueProperty().addListener((observable, oldValue, newValue) -> {
-            if (imagemOriginal != null) {
-                atualizarPreview(newValue.doubleValue());
-            }
-        });
+        // Atualiza a tela se o slider de contraste mudar
+        sliderContraste.valueProperty().addListener((obs, oldV, newV) -> atualizarPreview());
+        // Atualiza a tela se o slider de desfoque mudar
+        sliderDesfoque.valueProperty().addListener((obs, oldV, newV) -> atualizarPreview());
     }
 
     @FXML
     public void carregarImagem() {
-        // abre o seletor pra buscar a imagem no PC
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Escolher imagem para vetorizar");
-        fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Imagens", "*.png", "*.jpg", "*.jpeg")
-        );
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Imagens", "*.png", "*.jpg", "*.jpeg"));
 
         Stage stage = (Stage) visualizadorImagem.getScene().getWindow();
         File file = fileChooser.showOpenDialog(stage);
 
         if (file != null) {
-            // carrega a imagem em escala de cinza
             imagemOriginal = Imgcodecs.imread(file.getAbsolutePath(), Imgcodecs.IMREAD_GRAYSCALE);
 
-            // dobra o tamanho da imagem pra dar mais margem pro potrace achar os traços finos
-            org.opencv.core.Size novoTamanho = new org.opencv.core.Size(imagemOriginal.cols() * 2, imagemOriginal.rows() * 2);
+            Size novoTamanho = new Size(imagemOriginal.cols() * 2, imagemOriginal.rows() * 2);
             Imgproc.resize(imagemOriginal, imagemOriginal, novoTamanho, 0, 0, Imgproc.INTER_CUBIC);
 
             imagemProcessada = new Mat();
-
-            atualizarPreview(sliderContraste.getValue());
+            atualizarPreview();
             btnGerarSvg.setDisable(false);
         }
     }
 
-    private void atualizarPreview(double valorLimiar) {
-        // aplica o threshold do OpenCV pra separar o que é linha do que é fundo
-        Imgproc.threshold(imagemOriginal, imagemProcessada, valorLimiar, 255, Imgproc.THRESH_BINARY);
+    private void atualizarPreview() {
+        if (imagemOriginal == null) return;
 
-        // manda o resultado pro ImageView da tela
+        Mat imgTemp = new Mat();
+
+        int blurSize = (int) sliderDesfoque.getValue();
+        if (blurSize % 2 == 0) blurSize++; // O OpenCV exige que o valor do Blur seja ímpar (1, 3, 5, 7...)
+
+        if (blurSize > 1) {
+            Imgproc.GaussianBlur(imagemOriginal, imgTemp, new Size(blurSize, blurSize), 0);
+        } else {
+            imagemOriginal.copyTo(imgTemp);
+        }
+
+        Imgproc.threshold(imgTemp, imagemProcessada, sliderContraste.getValue(), 255, Imgproc.THRESH_BINARY);
+
         visualizadorImagem.setImage(matParaImage(imagemProcessada));
     }
 
     private Image matParaImage(Mat mat) {
-        // transforma o buffer do OpenCV em uma imagem que o JavaFX entende
         int width = mat.cols();
         int height = mat.rows();
         WritableImage image = new WritableImage(width, height);
@@ -104,75 +111,54 @@ public class AppController {
 
         if (fileDestino != null) {
             try {
-                // garante que o potrace.exe ta na raiz
                 File potraceExe = new File("potrace.exe");
                 if (!potraceExe.exists()) {
                     mostrarAlerta("Erro", "O potrace.exe não foi encontrado na raiz do projeto.", Alert.AlertType.ERROR);
                     return;
                 }
 
-                // cria os arquivos temporarios na raiz do projeto pra evitar bug de pasta do windows
                 File tempBmp = new File("temp_input.bmp");
                 File tempSvg = new File("temp_output.svg");
 
-                boolean salvouBmp = Imgcodecs.imwrite(tempBmp.getAbsolutePath(), imagemProcessada);
-                if (!salvouBmp) {
-                    mostrarAlerta("Erro no OpenCV", "Falha ao criar a imagem temporária (temp_input.bmp) para o Potrace ler.", Alert.AlertType.ERROR);
-                    return;
-                }
+                Imgcodecs.imwrite(tempBmp.getAbsolutePath(), imagemProcessada);
 
-                // passa as flags pro potrace desenhar com mais fidelidade e salvar localmente
+                String alphaStr = String.format(Locale.US, "%.2f", sliderCurvas.getValue());
+                String turdStr = String.valueOf((int) sliderManchas.getValue());
+
                 ProcessBuilder pb = new ProcessBuilder(
                         potraceExe.getAbsolutePath(),
                         tempBmp.getAbsolutePath(),
                         "-s",
-                        "-t", "2",
-                        "-a", "1.0",
-                        "-o",
-                        tempSvg.getAbsolutePath()
+                        "-t", turdStr,   // Usa o valor do slider de Manchas
+                        "-a", alphaStr,  // Usa o valor do slider de Curvas
+                        "-o", tempSvg.getAbsolutePath()
                 );
 
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
-
-                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()));
-                StringBuilder logPotrace = new java.lang.StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    logPotrace.append(line).append("\n");
-                }
-
                 process.waitFor();
 
-                // se o svg temporario foi gerado, move ele pro destino final que o usuario escolheu
                 if (process.exitValue() == 0 && tempSvg.exists()) {
-                    Files.move(
-                            tempSvg.toPath(),
-                            fileDestino.toPath(),
-                            StandardCopyOption.REPLACE_EXISTING
-                    );
-                    mostrarAlerta("Sucesso", "Vetor gerado com sucesso em:\n" + fileDestino.getAbsolutePath(), Alert.AlertType.INFORMATION);
+                    Files.move(tempSvg.toPath(), fileDestino.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    mostrarAlerta("Sucesso", "Vetor gerado com sucesso!", Alert.AlertType.INFORMATION);
                 } else {
-                    mostrarAlerta("Falha Silenciosa", "O Potrace rodou, mas falhou em gerar o arquivo.\n\nLog Interno:\n" + logPotrace.toString(), Alert.AlertType.ERROR);
+                    mostrarAlerta("Falha", "Erro ao processar o vetor.", Alert.AlertType.ERROR);
                 }
 
-                // limpa os arquivos temporarios da raiz
                 if (tempBmp.exists()) tempBmp.delete();
                 if (tempSvg.exists()) tempSvg.delete();
 
             } catch (Exception e) {
                 e.printStackTrace();
-                mostrarAlerta("Erro Crítico", "Falha ao invocar o executável do Potrace.\n" + e.getMessage(), Alert.AlertType.ERROR);
             }
         }
     }
 
     private void mostrarAlerta(String titulo, String mensagem, Alert.AlertType tipo) {
-        javafx.scene.control.Alert alerta = new javafx.scene.control.Alert(tipo);
+        Alert alerta = new Alert(tipo);
         alerta.setTitle(titulo);
         alerta.setHeaderText(null);
         alerta.setContentText(mensagem);
         alerta.showAndWait();
     }
-
 }
