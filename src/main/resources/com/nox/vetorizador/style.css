@@ -1,0 +1,118 @@
+.root {
+    -fx-base: #2D2D2D;
+    -fx-background-color: -fx-base;
+    -fx-accent: #00AFFF;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-font-family: "Segoe UI", "Open Sans", "Helvetica Neue", sans-serif;
+    -fx-text-fill: #F0F0F0;
+}
+
+.tool-bar {
+    -fx-background-color: #383838;
+    -fx-padding: 10 20 10 20;
+    -fx-spacing: 25;
+    -fx-alignment: center;
+    -fx-border-color: #1A1A1A;
+    -fx-border-width: 0 0 1 0;
+}
+
+.label-studio-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-accent;
+    -fx-padding: 0 30 0 0;
+}
+
+.control-group {
+    -fx-spacing: 15;
+    -fx-alignment: center-left;
+}
+
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+    -fx-padding: 8;
+    -fx-transition: 0.2s;
+}
+
+.icon-button:hover {
+    -fx-background-color: #4D4D4D;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+}
+
+.icon-button:pressed {
+    -fx-background-color: #1A1A1A;
+}
+
+.icon-button:disabled {
+    -fx-opacity: 0.4;
+    -fx-cursor: default;
+}
+
+.primary-button {
+    -fx-background-color: -fx-accent;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 10 20;
+    -fx-cursor: hand;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+}
+
+.primary-button:hover {
+    -fx-background-color: #33BDFF;
+}
+
+.primary-button:disabled {
+    -fx-background-color: #666666;
+    -fx-opacity: 0.6;
+}
+
+.slider-container {
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+}
+
+.slider-container .label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #B0B0B0;
+}
+
+.slider .track {
+    -fx-background-color: #1A1A1A;
+    -fx-background-radius: 5;
+    -fx-pref-height: 8;
+}
+
+.slider .thumb {
+    -fx-background-color: -fx-accent;
+    -fx-background-radius: 10;
+    -fx-pref-width: 18;
+    -fx-pref-height: 18;
+}
+
+.slider .thumb:hover {
+    -fx-background-color: #33BDFF;
+}
+
+.checkerboard-container {
+    -fx-background-color: #E0E0E0;
+    -fx-background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36z8gAFWNgYGBwYGCAAhYmBgYGBwYGJgYA+64E54FqO14AAAAASUVORK5CYII=");
+    -fx-background-repeat: repeat;
+    -fx-padding: 20;
+    -fx-border-color: #1A1A1A;
+    -fx-border-width: 1 0 0 0;
+}
+
+.sidebar {
+    -fx-background-color: #333333;
+    -fx-border-color: #1A1A1A;
+    -fx-border-width: 0 0 0 1;
+}
+
+.sidebar .slider {
+    -fx-padding: 10 0 0 0;
+}
