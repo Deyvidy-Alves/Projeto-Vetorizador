@@ -1,26 +1,29 @@
 package com.nox.vetorizador;
 
 import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import nu.pattern.OpenCV;
 import org.opencv.core.Core;
+import java.util.Objects;
 
 public class Main extends Application {
 
     @Override
-    public void start(Stage primaryStage) {
-        // Inicializa o motor do OpenCV
+    public void start(Stage primaryStage) throws Exception {
+        // inicializa o motor do OpenCV
         OpenCV.loadLocally();
         System.out.println("OpenCV carregado com sucesso! Versão: " + Core.VERSION);
 
-        // Cria uma tela básica em branco
-        StackPane root = new StackPane();
+        // carrega o arquivo visual FXML
+        Parent root = FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/com/nox/vetorizador/tela.fxml")));
+
         Scene scene = new Scene(root, 800, 600);
 
-        // Configura e exibe a janela
-        primaryStage.setTitle("Inicializado");
+        // Exibe o título na janela
+        primaryStage.setTitle("Vetorizador");
         primaryStage.setScene(scene);
         primaryStage.show();
     }
