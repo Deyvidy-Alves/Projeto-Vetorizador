@@ -21,12 +21,12 @@ public class AppController {
     @FXML private Slider sliderContraste;
     @FXML private Button btnGerarSvg;
 
-    private Mat imagemOriginal; // guardamos a original em memória
+    private Mat imagemOriginal;
     private Mat imagemProcessada;
 
     @FXML
     public void initialize() {
-        // toda vez que o slider mexer, ele chama o metodo de processamento
+        // escuta o slider e atualiza o preview na hora
         sliderContraste.valueProperty().addListener((observable, oldValue, newValue) -> {
             if (imagemOriginal != null) {
                 atualizarPreview(newValue.doubleValue());
@@ -36,8 +36,9 @@ public class AppController {
 
     @FXML
     public void carregarImagem() {
+        // abre o seletor pra buscar a imagem no PC
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Selecione a arte da Tatuagem");
+        fileChooser.setTitle("Escolher imagem para vetorizar");
         fileChooser.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("Imagens", "*.png", "*.jpg", "*.jpeg")
         );
@@ -46,7 +47,7 @@ public class AppController {
         File file = fileChooser.showOpenDialog(stage);
 
         if (file != null) {
-            // carrega a imagem em tons de cinza
+            // carrega a imagem em escala de cinza pra facilitar a binarização
             imagemOriginal = Imgcodecs.imread(file.getAbsolutePath(), Imgcodecs.IMREAD_GRAYSCALE);
             imagemProcessada = new Mat();
 
@@ -56,15 +57,15 @@ public class AppController {
     }
 
     private void atualizarPreview(double valorLimiar) {
-        // binarização: o que for menor que o valor do slider vira preto, o que for maior vira branco
+        // aplica o threshold do OpenCV pra separar o que é linha do que é fundo
         Imgproc.threshold(imagemOriginal, imagemProcessada, valorLimiar, 255, Imgproc.THRESH_BINARY);
 
-        // Converte de Mat para Image e joga na tela
+        // manda o resultado pro ImageView da tela
         visualizadorImagem.setImage(matParaImage(imagemProcessada));
     }
 
-    // Converte os formatos
     private Image matParaImage(Mat mat) {
+        // transforma o buffer do OpenCV em uma imagem que o JavaFX entende
         int width = mat.cols();
         int height = mat.rows();
         WritableImage image = new WritableImage(width, height);
@@ -79,5 +80,43 @@ public class AppController {
             }
         }
         return image;
+    }
+
+    @FXML
+    public void gerarSVG() {
+        if (imagemProcessada == null) return;
+
+        // pergunta onde quer salvar a porra do SVG final
+        FileChooser saveChooser = new FileChooser();
+        saveChooser.setTitle("Salvar Vetor");
+        saveChooser.setInitialFileName("resultado.svg");
+        saveChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Vetor SVG", "*.svg"));
+
+        Stage stage = (Stage) visualizadorImagem.getScene().getWindow();
+        File fileDestino = saveChooser.showSaveDialog(stage);
+
+        if (fileDestino != null) {
+            try {
+                // cria um BMP temporário porque o Potrace precisa de um arquivo de entrada
+                File tempBmp = new File("temp_input.bmp");
+                Imgcodecs.imwrite(tempBmp.getAbsolutePath(), imagemProcessada);
+
+                // monta o comando e chama o executável do Potrace
+                String command = "potrace temp_input.bmp -s -o \"" + fileDestino.getAbsolutePath() + "\"";
+
+                Process process = Runtime.getRuntime().exec(command);
+                process.waitFor();
+
+                if (process.exitValue() == 0) {
+                    System.out.println("Vetor gerado: " + fileDestino.getAbsolutePath());
+                }
+
+                // deleta o arquivo temporário pra não deixar lixo na pasta
+                tempBmp.delete();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
