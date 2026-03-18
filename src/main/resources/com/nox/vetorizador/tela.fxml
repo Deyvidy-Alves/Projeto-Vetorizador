@@ -30,6 +30,7 @@
             </VBox>
 
             <Button fx:id="btnGerarSvg" text="Vetorizar (SVG)" disable="true"
+                    onAction="#gerarSVG"
                     style="-fx-font-size: 14px; -fx-cursor: hand;"/>
         </HBox>
     </top>

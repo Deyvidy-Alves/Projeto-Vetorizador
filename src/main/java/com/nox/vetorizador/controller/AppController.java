@@ -1,6 +1,7 @@
 package com.nox.vetorizador.controller;
 
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Slider;
 import javafx.scene.image.Image;
@@ -14,6 +15,8 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 public class AppController {
 
@@ -47,8 +50,13 @@ public class AppController {
         File file = fileChooser.showOpenDialog(stage);
 
         if (file != null) {
-            // carrega a imagem em escala de cinza pra facilitar a binarização
+            // carrega a imagem em escala de cinza
             imagemOriginal = Imgcodecs.imread(file.getAbsolutePath(), Imgcodecs.IMREAD_GRAYSCALE);
+
+            // dobra o tamanho da imagem pra dar mais margem pro potrace achar os traços finos
+            org.opencv.core.Size novoTamanho = new org.opencv.core.Size(imagemOriginal.cols() * 2, imagemOriginal.rows() * 2);
+            Imgproc.resize(imagemOriginal, imagemOriginal, novoTamanho, 0, 0, Imgproc.INTER_CUBIC);
+
             imagemProcessada = new Mat();
 
             atualizarPreview(sliderContraste.getValue());
@@ -86,7 +94,6 @@ public class AppController {
     public void gerarSVG() {
         if (imagemProcessada == null) return;
 
-        // pergunta onde quer salvar a porra do SVG final
         FileChooser saveChooser = new FileChooser();
         saveChooser.setTitle("Salvar Vetor");
         saveChooser.setInitialFileName("resultado.svg");
@@ -97,26 +104,75 @@ public class AppController {
 
         if (fileDestino != null) {
             try {
-                // cria um BMP temporário porque o Potrace precisa de um arquivo de entrada
-                File tempBmp = new File("temp_input.bmp");
-                Imgcodecs.imwrite(tempBmp.getAbsolutePath(), imagemProcessada);
-
-                // monta o comando e chama o executável do Potrace
-                String command = "potrace temp_input.bmp -s -o \"" + fileDestino.getAbsolutePath() + "\"";
-
-                Process process = Runtime.getRuntime().exec(command);
-                process.waitFor();
-
-                if (process.exitValue() == 0) {
-                    System.out.println("Vetor gerado: " + fileDestino.getAbsolutePath());
+                // garante que o potrace.exe ta na raiz
+                File potraceExe = new File("potrace.exe");
+                if (!potraceExe.exists()) {
+                    mostrarAlerta("Erro", "O potrace.exe não foi encontrado na raiz do projeto.", Alert.AlertType.ERROR);
+                    return;
                 }
 
-                // deleta o arquivo temporário pra não deixar lixo na pasta
-                tempBmp.delete();
+                // cria os arquivos temporarios na raiz do projeto pra evitar bug de pasta do windows
+                File tempBmp = new File("temp_input.bmp");
+                File tempSvg = new File("temp_output.svg");
+
+                boolean salvouBmp = Imgcodecs.imwrite(tempBmp.getAbsolutePath(), imagemProcessada);
+                if (!salvouBmp) {
+                    mostrarAlerta("Erro no OpenCV", "Falha ao criar a imagem temporária (temp_input.bmp) para o Potrace ler.", Alert.AlertType.ERROR);
+                    return;
+                }
+
+                // passa as flags pro potrace desenhar com mais fidelidade e salvar localmente
+                ProcessBuilder pb = new ProcessBuilder(
+                        potraceExe.getAbsolutePath(),
+                        tempBmp.getAbsolutePath(),
+                        "-s",
+                        "-t", "2",
+                        "-a", "1.0",
+                        "-o",
+                        tempSvg.getAbsolutePath()
+                );
+
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()));
+                StringBuilder logPotrace = new java.lang.StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    logPotrace.append(line).append("\n");
+                }
+
+                process.waitFor();
+
+                // se o svg temporario foi gerado, move ele pro destino final que o usuario escolheu
+                if (process.exitValue() == 0 && tempSvg.exists()) {
+                    Files.move(
+                            tempSvg.toPath(),
+                            fileDestino.toPath(),
+                            StandardCopyOption.REPLACE_EXISTING
+                    );
+                    mostrarAlerta("Sucesso", "Vetor gerado com sucesso em:\n" + fileDestino.getAbsolutePath(), Alert.AlertType.INFORMATION);
+                } else {
+                    mostrarAlerta("Falha Silenciosa", "O Potrace rodou, mas falhou em gerar o arquivo.\n\nLog Interno:\n" + logPotrace.toString(), Alert.AlertType.ERROR);
+                }
+
+                // limpa os arquivos temporarios da raiz
+                if (tempBmp.exists()) tempBmp.delete();
+                if (tempSvg.exists()) tempSvg.delete();
 
             } catch (Exception e) {
                 e.printStackTrace();
+                mostrarAlerta("Erro Crítico", "Falha ao invocar o executável do Potrace.\n" + e.getMessage(), Alert.AlertType.ERROR);
             }
         }
     }
+
+    private void mostrarAlerta(String titulo, String mensagem, Alert.AlertType tipo) {
+        javafx.scene.control.Alert alerta = new javafx.scene.control.Alert(tipo);
+        alerta.setTitle(titulo);
+        alerta.setHeaderText(null);
+        alerta.setContentText(mensagem);
+        alerta.showAndWait();
+    }
+
 }
