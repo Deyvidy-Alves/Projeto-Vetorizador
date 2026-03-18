@@ -13,14 +13,14 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
         // Inicializa o motor do OpenCV
         OpenCV.loadLocally();
-        System.out.println("✅ OpenCV carregado com sucesso! Versão: " + Core.VERSION);
+        System.out.println("OpenCV carregado com sucesso! Versão: " + Core.VERSION);
 
         // Cria uma tela básica em branco
         StackPane root = new StackPane();
         Scene scene = new Scene(root, 800, 600);
 
         // Configura e exibe a janela
-        primaryStage.setTitle("Tattu Vector - Inicializado");
+        primaryStage.setTitle("Inicializado");
         primaryStage.setScene(scene);
         primaryStage.show();
     }
